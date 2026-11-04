@@ -31,12 +31,26 @@
         "atencionSoporte",
         "cumpleNecesidades"
       ]
+    },
+    "SystemConfig": {
+      "title": "SystemConfig",
+      "description": "Global configuration for Google Sheets sync across all devices",
+      "type": "object",
+      "properties": {
+        "spreadsheetId": { "type": "string" },
+        "sheetTabName": { "type": "string" },
+        "appsScriptWebhookUrl": { "type": "string" }
+      }
     }
   },
   "firestore": {
     "/survey_responses/{responseId}": {
       "schema": "SurveyResponse",
       "description": "Collection of all survey responses submitted by users from any device"
+    },
+    "/system_config/{configId}": {
+      "schema": "SystemConfig",
+      "description": "Global system configuration shared across all devices"
     }
   }
 }

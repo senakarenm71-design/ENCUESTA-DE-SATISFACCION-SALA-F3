@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { Navbar } from './components/Navbar';
 import { SurveyForm } from './components/SurveyForm';
-import { ResponsesView } from './components/ResponsesView';
-import { SheetsConfigModal } from './components/SheetsConfigModal';
-import { HtmlExportModal } from './components/HtmlExportModal';
+import { AdminModal } from './components/AdminModal';
 import { SurveyResponse, SheetConfig } from './types/survey';
 import { 
   initAuth, 
@@ -28,8 +26,6 @@ import {
   testFirestoreConnection
 } from './lib/firestoreService';
 
-// Default initial responses seeded from the user's attachment:
-// /public/assets/aistudio/Encuesta_de_satisfaccion_sobre_la_sala_f3__respuestas__579e085f
 const INITIAL_SAMPLE_RESPONSES: SurveyResponse[] = [
   {
     id: 'res-sample-1',
@@ -67,13 +63,23 @@ const LOCAL_STORAGE_KEY_RESPONSES = 'sena_f3_survey_responses_v1';
 const LOCAL_STORAGE_KEY_CONFIG = 'sena_f3_sheet_config_v1';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'form' | 'responses' | 'html-code' | 'config'>('form');
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Sheet configuration (Permanently defaults to 1IcmRuDYpZKNfDqn1BZkhjl4KfXox_C5QtiSOMf-P0kY and tab 'encuesta IA')
+  // Check URL param ?admin=true
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('admin') === 'true') {
+        setIsAdminOpen(true);
+      }
+    }
+  }, []);
+
+  // Sheet configuration: permanently bound to 1IcmRuDYpZKNfDqn1BZkhjl4KfXox_C5QtiSOMf-P0kY and tab 'encuesta IA'
   const [sheetConfig, setSheetConfig] = useState<SheetConfig>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY_CONFIG);
@@ -81,8 +87,8 @@ export default function App() {
         const parsed = JSON.parse(saved);
         return {
           ...parsed,
-          spreadsheetId: parsed.spreadsheetId || DEFAULT_SPREADSHEET_ID,
-          sheetTabName: parsed.sheetTabName || TARGET_SHEET_NAME
+          spreadsheetId: DEFAULT_SPREADSHEET_ID,
+          sheetTabName: TARGET_SHEET_NAME
         };
       }
     } catch (e) {
@@ -152,8 +158,8 @@ export default function App() {
       const token = await getAccessToken();
       if (!token) return;
 
-      const targetId = sheetConfig.spreadsheetId || DEFAULT_SPREADSHEET_ID;
-      const targetTab = sheetConfig.sheetTabName || TARGET_SHEET_NAME;
+      const targetId = DEFAULT_SPREADSHEET_ID;
+      const targetTab = TARGET_SHEET_NAME;
 
       try {
         await ensureEncuestaSheetExists(token, targetId, targetTab);
@@ -168,7 +174,7 @@ export default function App() {
     };
 
     runAutoSync();
-  }, [user, responses, sheetConfig.spreadsheetId, sheetConfig.sheetTabName]);
+  }, [user, responses]);
 
   // Initialize Auth
   useEffect(() => {
@@ -177,9 +183,7 @@ export default function App() {
         setUser(currentUser);
         if (token) {
           try {
-            const targetId = sheetConfig.spreadsheetId || DEFAULT_SPREADSHEET_ID;
-            const targetTab = sheetConfig.sheetTabName || TARGET_SHEET_NAME;
-            await ensureEncuestaSheetExists(token, targetId, targetTab);
+            await ensureEncuestaSheetExists(token, DEFAULT_SPREADSHEET_ID, TARGET_SHEET_NAME);
           } catch (err) {
             console.warn('Auto-sync on login note:', err);
           }
@@ -190,7 +194,7 @@ export default function App() {
       }
     );
     return () => unsubscribe();
-  }, [sheetConfig.spreadsheetId, sheetConfig.sheetTabName]);
+  }, []);
 
   const handleLogin = async () => {
     setIsLoggingIn(true);
@@ -211,10 +215,6 @@ export default function App() {
     setUser(null);
   };
 
-  const handleSaveConfig = (newConfig: SheetConfig) => {
-    setSheetConfig(newConfig);
-  };
-
   // Submit new survey response
   const handleSubmitResponse = async (
     data: Omit<SurveyResponse, 'id' | 'timestamp' | 'syncedToGoogleSheets'>
@@ -232,8 +232,8 @@ export default function App() {
     };
 
     let synced = false;
-    const targetSpreadsheetId = sheetConfig.spreadsheetId || DEFAULT_SPREADSHEET_ID;
-    const targetTab = sheetConfig.sheetTabName || TARGET_SHEET_NAME;
+    const targetSpreadsheetId = DEFAULT_SPREADSHEET_ID;
+    const targetTab = TARGET_SHEET_NAME;
 
     // 1. Immediately persist to Firestore so ALL other devices see it in real time
     try {
@@ -250,7 +250,6 @@ export default function App() {
         const row = responseToRow(newResponse);
         await appendRowToSheet(token, targetSpreadsheetId, targetTab, row);
         synced = true;
-        // Mark as synced in Firestore
         await updateResponseSyncStatus(newResponse.id, true).catch(() => {});
       } else if (sheetConfig.appsScriptWebhookUrl) {
         await sendViaAppsScript(sheetConfig.appsScriptWebhookUrl, newResponse);
@@ -273,11 +272,8 @@ export default function App() {
     return true;
   };
 
-  // Sync any pending un-synced responses to Google Sheets
+  // Manual trigger for syncing pending responses from admin panel
   const handleSyncPending = async () => {
-    const targetSpreadsheetId = sheetConfig.spreadsheetId || DEFAULT_SPREADSHEET_ID;
-    const targetTab = sheetConfig.sheetTabName || TARGET_SHEET_NAME;
-
     const token = await getAccessToken();
     if (!token) {
       await handleLogin();
@@ -286,12 +282,13 @@ export default function App() {
 
     setIsSyncing(true);
     try {
-      await ensureEncuestaSheetExists(token, targetSpreadsheetId, targetTab);
+      await ensureEncuestaSheetExists(token, DEFAULT_SPREADSHEET_ID, TARGET_SHEET_NAME);
 
       const pending = responses.filter((r) => !r.syncedToGoogleSheets);
       for (const item of pending) {
         const row = responseToRow(item);
-        await appendRowToSheet(token, targetSpreadsheetId, targetTab, row);
+        await appendRowToSheet(token, DEFAULT_SPREADSHEET_ID, TARGET_SHEET_NAME, row);
+        await updateResponseSyncStatus(item.id, true);
       }
 
       setResponses((prev) =>
@@ -299,36 +296,7 @@ export default function App() {
       );
     } catch (err) {
       console.error('Sync failed:', err);
-      alert('Hubo un inconveniente al sincronizar. Verifique permisos o el ID de la hoja.');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  // Refresh data from Google Sheets
-  const handleRefreshFromSheet = async () => {
-    const targetSpreadsheetId = sheetConfig.spreadsheetId || DEFAULT_SPREADSHEET_ID;
-    const targetTab = sheetConfig.sheetTabName || TARGET_SHEET_NAME;
-
-    const token = await getAccessToken();
-    if (!token) {
-      await handleLogin();
-      return;
-    }
-
-    setIsSyncing(true);
-    try {
-      const sheetRows = await fetchSheetResponses(
-        token,
-        targetSpreadsheetId,
-        targetTab
-      );
-
-      if (sheetRows && sheetRows.length > 0) {
-        setResponses(sheetRows);
-      }
-    } catch (err) {
-      console.error('Failed to load from sheet:', err);
+      alert('Hubo un inconveniente al sincronizar. Verifique permisos.');
     } finally {
       setIsSyncing(false);
     }
@@ -337,65 +305,49 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
       
-      {/* Navbar with SENA identity and Tabs */}
+      {/* Clean Institutional Header - No Tabs, No Clutter */}
       <Navbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        onOpenAdmin={() => setIsAdminOpen(true)}
+        isAdminOpen={isAdminOpen}
+      />
+
+      {/* Main Content Area: ONLY THE SURVEY FORM FOR RESPONDENTS */}
+      <main className="flex-1 pb-16">
+        <SurveyForm
+          sheetConfig={sheetConfig}
+          onSubmit={handleSubmitResponse}
+          isSubmitting={isSubmitting}
+        />
+      </main>
+
+      {/* Admin Panel Modal (Protected / Hidden from normal respondents) */}
+      <AdminModal
+        isOpen={isAdminOpen}
+        onClose={() => setIsAdminOpen(false)}
         user={user}
         isLoggingIn={isLoggingIn}
         onLogin={handleLogin}
         onLogout={handleLogout}
         sheetConfig={sheetConfig}
-        responseCount={responses.length}
+        responses={responses}
+        onSyncPendingToSheet={handleSyncPending}
+        isSyncing={isSyncing}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 pb-16">
-        {activeTab === 'form' && (
-          <SurveyForm
-            sheetConfig={sheetConfig}
-            onSubmit={handleSubmitResponse}
-            isSubmitting={isSubmitting}
-            onOpenConfig={() => setActiveTab('config')}
-          />
-        )}
-
-        {activeTab === 'responses' && (
-          <ResponsesView
-            responses={responses}
-            sheetConfig={sheetConfig}
-            onRefreshFromSheet={handleRefreshFromSheet}
-            onSyncPendingToSheet={handleSyncPending}
-            isSyncing={isSyncing}
-          />
-        )}
-
-        {activeTab === 'config' && (
-          <SheetsConfigModal
-            sheetConfig={sheetConfig}
-            onSaveConfig={handleSaveConfig}
-            user={user}
-            onLogin={handleLogin}
-          />
-        )}
-
-        {activeTab === 'html-code' && (
-          <HtmlExportModal
-            sheetConfig={sheetConfig}
-          />
-        )}
-      </main>
-
-      {/* Institutional Footer */}
+      {/* Discreet Institutional Footer */}
       <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 font-medium">
             <span className="w-2 h-2 rounded-full bg-[#39A900]"></span>
             <span>Servicio Nacional de Aprendizaje SENA • Centro Agropecuario de Buga</span>
           </div>
-          <div>
-            Ambiente F3 • Destino Google Sheets: <span className="font-semibold text-emerald-800">"{sheetConfig.sheetTabName}"</span>
-          </div>
+          <button
+            onClick={() => setIsAdminOpen(true)}
+            className="text-[11px] text-slate-400 hover:text-emerald-700 transition flex items-center gap-1 cursor-pointer"
+          >
+            <span>Acceso Administrativo</span>
+            <span>🔒</span>
+          </button>
         </div>
       </footer>
 

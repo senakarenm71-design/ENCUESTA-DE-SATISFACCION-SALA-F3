@@ -22,7 +22,7 @@ interface SurveyFormProps {
   sheetConfig: SheetConfig;
   onSubmit: (response: Omit<SurveyResponse, 'id' | 'timestamp' | 'syncedToGoogleSheets'>) => Promise<boolean>;
   isSubmitting: boolean;
-  onOpenConfig: () => void;
+  onOpenConfig?: () => void;
 }
 
 const RATING_LABELS: Record<number, { label: string; color: string }> = {
@@ -36,8 +36,7 @@ const RATING_LABELS: Record<number, { label: string; color: string }> = {
 export const SurveyForm: React.FC<SurveyFormProps> = ({
   sheetConfig,
   onSubmit,
-  isSubmitting,
-  onOpenConfig
+  isSubmitting
 }) => {
   const getToday = () => new Date().toISOString().split('T')[0];
 
@@ -152,15 +151,6 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
           Agradecemos su tiempo para evaluar la <strong>Sala de Computación F3</strong> del Centro Agropecuario de Buga. Su opinión permite mejorar continuamente la calidad de nuestros ambientes de aprendizaje.
         </p>
 
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl mb-6 text-left max-w-md mx-auto text-xs text-emerald-900 space-y-1">
-          <div className="font-semibold flex items-center gap-1.5 text-emerald-800">
-            <FileSpreadsheet className="w-4 h-4" />
-            Destino de almacenamiento:
-          </div>
-          <div>• Hoja de cálculo de Google: <strong className="text-emerald-950">"{sheetConfig.sheetTabName || 'encuesta IA'}"</strong></div>
-          <div>• Copia guardada localmente para auditoría y respaldo.</div>
-        </div>
-
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <button
             onClick={resetForm}
@@ -173,8 +163,6 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
       </div>
     );
   }
-
-  const isConnected = Boolean(sheetConfig.spreadsheetId || sheetConfig.appsScriptWebhookUrl);
 
   return (
     <div className="max-w-3xl mx-auto py-6 px-4">
@@ -197,32 +185,6 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
             Centro Agropecuario de Buga. Por favor, califique los siguientes 10 aspectos sobre las instalaciones y equipos de cómputo para orientar los planes de mantenimiento y mejora continua.
           </p>
         </div>
-      </div>
-
-      {/* Sheet Connection Banner Info */}
-      <div className={`mb-6 p-4 rounded-xl border flex items-start justify-between gap-4 text-xs sm:text-sm ${
-        isConnected 
-          ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900' 
-          : 'bg-amber-50 border-amber-200 text-amber-900'
-      }`}>
-        <div className="flex items-start gap-3">
-          <FileSpreadsheet className="w-5 h-5 shrink-0 mt-0.5 text-emerald-600" />
-          <div>
-            <div className="font-bold text-slate-900 flex items-center gap-1.5">
-              <span>Guardado automático multidispositivo activo</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            </div>
-            <p className="mt-0.5 text-xs text-slate-600">
-              Cualquier respuesta enviada desde este u otro celular/computador se guarda de inmediato en la nube y se vuelca automáticamente a su hoja de cálculo de Google (ID: <span className="font-mono font-bold text-emerald-950">1IcmRuDY...SOMf-P0kY</span>) en la pestaña <strong className="text-emerald-800 font-bold">"{sheetConfig.sheetTabName}"</strong>.
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={onOpenConfig}
-          className="shrink-0 px-3 py-1.5 rounded-lg bg-white border border-slate-300 font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs text-xs"
-        >
-          {isConnected ? 'Ver Ajustes' : 'Configurar'}
-        </button>
       </div>
 
       {errorMessage && (
