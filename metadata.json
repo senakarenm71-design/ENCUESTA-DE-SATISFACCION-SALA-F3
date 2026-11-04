@@ -1,0 +1,6 @@
+{
+  "name": "Encuesta F3 - Centro Agropecuario Buga",
+  "description": "Formulario de satisfacción sobre el uso de la sala de cómputo F3 del Centro Agropecuario de Buga con envío a Google Sheets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
