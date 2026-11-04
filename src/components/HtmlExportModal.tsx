@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Copy, Check, Download, Code, FileSpreadsheet, ExternalLink, Sparkles } from 'lucide-react';
 import { SheetConfig } from '../types/survey';
+import { DEFAULT_SPREADSHEET_ID } from '../lib/sheetsService';
 
 interface HtmlExportModalProps {
   sheetConfig: SheetConfig;
@@ -13,6 +14,7 @@ export const HtmlExportModal: React.FC<HtmlExportModalProps> = ({ sheetConfig })
 
   const webhookUrlPlaceholder = sheetConfig.appsScriptWebhookUrl || 'PEGA_AQUI_LA_URL_DE_TU_APPS_SCRIPT';
   const targetSheetName = sheetConfig.sheetTabName || 'encuesta IA';
+  const spreadsheetId = sheetConfig.spreadsheetId || DEFAULT_SPREADSHEET_ID;
 
   const generateStandaloneHtml = () => `<!DOCTYPE html>
 <html lang="es">
@@ -258,11 +260,19 @@ export const HtmlExportModal: React.FC<HtmlExportModalProps> = ({ sheetConfig })
 
   const appsScriptCode = `/**
  * Código de Google Apps Script para recibir respuestas de la encuesta de la Sala F3
- * y escribirlas directamente en la pestaña "${targetSheetName}".
+ * y escribirlas directamente en la hoja con ID "${spreadsheetId}"
+ * en la pestaña "${targetSheetName}".
  */
 function doPost(e) {
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var SPREADSHEET_ID = "${spreadsheetId}";
+    var ss;
+    try {
+      ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    } catch(err) {
+      ss = SpreadsheetApp.getActiveSpreadsheet();
+    }
+    
     var sheetName = "${targetSheetName}";
     var sheet = ss.getSheetByName(sheetName);
 

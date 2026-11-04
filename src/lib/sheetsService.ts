@@ -15,6 +15,7 @@ export const SURVEY_HEADERS = [
 ];
 
 export const TARGET_SHEET_NAME = 'encuesta IA';
+export const DEFAULT_SPREADSHEET_ID = '1IcmRuDYpZKNfDqn1BZkhjl4KfXox_C5QtiSOMf-P0kY';
 
 /**
  * Convert a SurveyResponse object into a row array matching SURVEY_HEADERS

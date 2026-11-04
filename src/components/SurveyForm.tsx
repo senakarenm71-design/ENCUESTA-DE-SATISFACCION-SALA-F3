@@ -206,18 +206,13 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
           : 'bg-amber-50 border-amber-200 text-amber-900'
       }`}>
         <div className="flex items-start gap-3">
-          <FileSpreadsheet className={`w-5 h-5 shrink-0 mt-0.5 ${isConnected ? 'text-emerald-600' : 'text-amber-600'}`} />
+          <FileSpreadsheet className="w-5 h-5 shrink-0 mt-0.5 text-emerald-600" />
           <div>
             <span className="font-bold">
-              {isConnected ? 'Conectado a Google Sheets:' : 'Conexión a Google Sheets:'}
+              Conectado a Google Sheets:
             </span>{' '}
-            Las respuestas se registrarán automáticamente en la pestaña llamada{' '}
+            Las respuestas se registrarán directamente en la hoja oficial (ID: <span className="font-mono font-bold text-emerald-950 text-xs">1IcmRuDY...SOMf-P0kY</span>) en la pestaña llamada{' '}
             <strong className="underline decoration-emerald-500 font-bold">"{sheetConfig.sheetTabName}"</strong>.
-            {!isConnected && (
-              <p className="mt-1 text-xs text-amber-800">
-                Aún no ha vinculado su hoja de cálculo. Se guardará de respaldo local y podrá sincronizarla al conectar.
-              </p>
-            )}
           </div>
         </div>
         <button

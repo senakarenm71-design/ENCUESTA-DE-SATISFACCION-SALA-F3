@@ -12,7 +12,7 @@ import {
   Check
 } from 'lucide-react';
 import { SheetConfig } from '../types/survey';
-import { TARGET_SHEET_NAME, createSpreadsheet, ensureEncuestaSheetExists } from '../lib/sheetsService';
+import { TARGET_SHEET_NAME, DEFAULT_SPREADSHEET_ID, createSpreadsheet, ensureEncuestaSheetExists } from '../lib/sheetsService';
 import { getAccessToken } from '../lib/firebase';
 
 interface SheetsConfigModalProps {
@@ -28,7 +28,7 @@ export const SheetsConfigModal: React.FC<SheetsConfigModalProps> = ({
   user,
   onLogin
 }) => {
-  const [spreadsheetInput, setSpreadsheetInput] = useState(sheetConfig.spreadsheetId);
+  const [spreadsheetInput, setSpreadsheetInput] = useState(sheetConfig.spreadsheetId || DEFAULT_SPREADSHEET_ID);
   const [sheetTabName, setSheetTabName] = useState(sheetConfig.sheetTabName || TARGET_SHEET_NAME);
   const [appsScriptUrl, setAppsScriptUrl] = useState(sheetConfig.appsScriptWebhookUrl || '');
   const [isCreatingNew, setIsCreatingNew] = useState(false);
@@ -191,33 +191,46 @@ export const SheetsConfigModal: React.FC<SheetsConfigModalProps> = ({
             )}
           </div>
 
-          {/* Option A: Quick 1-click Create Sheet */}
-          <div className="p-5 rounded-2xl bg-emerald-50/60 border border-emerald-200">
+          {/* Official Default Sheet Card */}
+          <div className="p-5 rounded-2xl bg-emerald-50 border-2 border-emerald-300">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-200 text-emerald-900 uppercase mb-1">
-                  Opción recomendada
+                <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-700 text-white uppercase tracking-wider mb-1.5">
+                  ✓ Hoja Oficial Predeterminada
                 </span>
-                <h3 className="font-bold text-slate-900 text-sm sm:text-base">
-                  Crear hoja automática con la pestaña "encuesta IA"
+                <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">
+                  ID: <span className="font-mono text-emerald-900 bg-white/80 px-2 py-0.5 rounded border border-emerald-200 select-all">{DEFAULT_SPREADSHEET_ID}</span>
                 </h3>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  Genera una hoja nueva en su Google Drive con las 10 columnas y la pestaña llamada exactamente <strong>"encuesta IA"</strong>.
+                <p className="text-xs text-slate-600 mt-1">
+                  Página configurada: <strong className="text-emerald-800">"encuesta IA"</strong>. Todas las respuestas de cualquier equipo se envían directamente a esta hoja.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={handleCreateAutoSheet}
-                disabled={isCreatingNew}
-                className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs sm:text-sm shadow-xs transition disabled:opacity-50"
-              >
-                <PlusCircle className="w-4 h-4" />
-                {isCreatingNew ? 'Creando hoja en Google...' : 'Crear en mi Google Drive'}
-              </button>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`https://docs.google.com/spreadsheets/d/${DEFAULT_SPREADSHEET_ID}/edit`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-bold text-xs shadow-2xs transition"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                  Abrir Hoja
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSpreadsheetInput(DEFAULT_SPREADSHEET_ID);
+                    setSheetTabName(TARGET_SHEET_NAME);
+                  }}
+                  className="shrink-0 px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs transition"
+                >
+                  Restablecer
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Option B: Manual link */}
+          {/* Form */}
           <form onSubmit={handleSave} className="space-y-4 pt-2">
             <div>
               <label htmlFor="spreadsheetInput" className="block text-xs font-bold uppercase text-slate-700 mb-1">

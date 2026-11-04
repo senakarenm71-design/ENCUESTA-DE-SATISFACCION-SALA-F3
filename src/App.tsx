@@ -14,6 +14,7 @@ import {
 } from './lib/firebase';
 import { 
   TARGET_SHEET_NAME, 
+  DEFAULT_SPREADSHEET_ID,
   appendRowToSheet, 
   responseToRow, 
   ensureEncuestaSheetExists, 
@@ -66,16 +67,23 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Sheet configuration
+  // Sheet configuration (Permanently defaults to 1IcmRuDYpZKNfDqn1BZkhjl4KfXox_C5QtiSOMf-P0kY and tab 'encuesta IA')
   const [sheetConfig, setSheetConfig] = useState<SheetConfig>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY_CONFIG);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          ...parsed,
+          spreadsheetId: parsed.spreadsheetId || DEFAULT_SPREADSHEET_ID,
+          sheetTabName: parsed.sheetTabName || TARGET_SHEET_NAME
+        };
+      }
     } catch (e) {
       console.warn('Error reading config from localStorage', e);
     }
     return {
-      spreadsheetId: '',
+      spreadsheetId: DEFAULT_SPREADSHEET_ID,
       sheetTabName: TARGET_SHEET_NAME,
       appsScriptWebhookUrl: '',
       autoSync: true
@@ -114,18 +122,31 @@ export default function App() {
     }
   }, [sheetConfig]);
 
-  // Initialize Auth
+  // Initialize Auth & auto-load responses from the default Google Sheet
   useEffect(() => {
     const unsubscribe = initAuth(
-      (currentUser) => {
+      async (currentUser, token) => {
         setUser(currentUser);
+        if (token) {
+          try {
+            const targetId = sheetConfig.spreadsheetId || DEFAULT_SPREADSHEET_ID;
+            const targetTab = sheetConfig.sheetTabName || TARGET_SHEET_NAME;
+            await ensureEncuestaSheetExists(token, targetId, targetTab);
+            const sheetRows = await fetchSheetResponses(token, targetId, targetTab);
+            if (sheetRows && sheetRows.length > 0) {
+              setResponses(sheetRows);
+            }
+          } catch (err) {
+            console.warn('Auto-sync from default sheet on login:', err);
+          }
+        }
       },
       () => {
         setUser(null);
       }
     );
     return () => unsubscribe();
-  }, []);
+  }, [sheetConfig.spreadsheetId, sheetConfig.sheetTabName]);
 
   const handleLogin = async () => {
     setIsLoggingIn(true);
@@ -167,14 +188,16 @@ export default function App() {
     };
 
     let synced = false;
+    const targetSpreadsheetId = sheetConfig.spreadsheetId || DEFAULT_SPREADSHEET_ID;
+    const targetTab = sheetConfig.sheetTabName || TARGET_SHEET_NAME;
 
     // 1. Try sending via Google Sheets API if logged in and spreadsheet configured
     try {
       const token = await getAccessToken();
-      if (token && sheetConfig.spreadsheetId) {
-        await ensureEncuestaSheetExists(token, sheetConfig.spreadsheetId, sheetConfig.sheetTabName || TARGET_SHEET_NAME);
+      if (token && targetSpreadsheetId) {
+        await ensureEncuestaSheetExists(token, targetSpreadsheetId, targetTab);
         const row = responseToRow(newResponse);
-        await appendRowToSheet(token, sheetConfig.spreadsheetId, sheetConfig.sheetTabName || TARGET_SHEET_NAME, row);
+        await appendRowToSheet(token, targetSpreadsheetId, targetTab, row);
         synced = true;
       } else if (sheetConfig.appsScriptWebhookUrl) {
         // 2. Try Apps Script Webhook
@@ -195,10 +218,8 @@ export default function App() {
 
   // Sync any pending un-synced responses to Google Sheets
   const handleSyncPending = async () => {
-    if (!sheetConfig.spreadsheetId) {
-      setActiveTab('config');
-      return;
-    }
+    const targetSpreadsheetId = sheetConfig.spreadsheetId || DEFAULT_SPREADSHEET_ID;
+    const targetTab = sheetConfig.sheetTabName || TARGET_SHEET_NAME;
 
     const token = await getAccessToken();
     if (!token) {
@@ -208,12 +229,12 @@ export default function App() {
 
     setIsSyncing(true);
     try {
-      await ensureEncuestaSheetExists(token, sheetConfig.spreadsheetId, sheetConfig.sheetTabName || TARGET_SHEET_NAME);
+      await ensureEncuestaSheetExists(token, targetSpreadsheetId, targetTab);
 
       const pending = responses.filter((r) => !r.syncedToGoogleSheets);
       for (const item of pending) {
         const row = responseToRow(item);
-        await appendRowToSheet(token, sheetConfig.spreadsheetId, sheetConfig.sheetTabName || TARGET_SHEET_NAME, row);
+        await appendRowToSheet(token, targetSpreadsheetId, targetTab, row);
       }
 
       setResponses((prev) =>
@@ -229,7 +250,8 @@ export default function App() {
 
   // Refresh data from Google Sheets
   const handleRefreshFromSheet = async () => {
-    if (!sheetConfig.spreadsheetId) return;
+    const targetSpreadsheetId = sheetConfig.spreadsheetId || DEFAULT_SPREADSHEET_ID;
+    const targetTab = sheetConfig.sheetTabName || TARGET_SHEET_NAME;
 
     const token = await getAccessToken();
     if (!token) {
@@ -241,8 +263,8 @@ export default function App() {
     try {
       const sheetRows = await fetchSheetResponses(
         token,
-        sheetConfig.spreadsheetId,
-        sheetConfig.sheetTabName || TARGET_SHEET_NAME
+        targetSpreadsheetId,
+        targetTab
       );
 
       if (sheetRows && sheetRows.length > 0) {
