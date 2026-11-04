@@ -1,0 +1,42 @@
+{
+  "entities": {
+    "SurveyResponse": {
+      "title": "SurveyResponse",
+      "description": "A single survey response for Ambiente F3 computer room",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "fechaUso": { "type": "string" },
+        "relacionCentro": { "type": "string" },
+        "frecuenciaUso": { "type": "string" },
+        "estadoInstalaciones": { "type": "number" },
+        "equiposFuncionamiento": { "type": "number" },
+        "climatizacionVentilacion": { "type": "number" },
+        "comodidadEspacio": { "type": "number" },
+        "atencionSoporte": { "type": "number" },
+        "cumpleNecesidades": { "type": "string" },
+        "sugerenciasMejora": { "type": "string" },
+        "syncedToGoogleSheets": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": [
+        "fechaUso",
+        "relacionCentro",
+        "frecuenciaUso",
+        "estadoInstalaciones",
+        "equiposFuncionamiento",
+        "climatizacionVentilacion",
+        "comodidadEspacio",
+        "atencionSoporte",
+        "cumpleNecesidades"
+      ]
+    }
+  },
+  "firestore": {
+    "/survey_responses/{responseId}": {
+      "schema": "SurveyResponse",
+      "description": "Collection of all survey responses submitted by users from any device"
+    }
+  }
+}

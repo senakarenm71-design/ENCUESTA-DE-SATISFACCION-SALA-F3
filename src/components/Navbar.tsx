@@ -45,9 +45,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                   Sala F3
                 </span>
               </div>
-              <p className="text-xs text-slate-500 hidden sm:block">
-                Encuesta de Satisfacción • Hoja destino: <strong className="text-emerald-700">"encuesta IA"</strong>
-              </p>
+              <div className="flex items-center gap-2 text-xs text-slate-500 hidden sm:flex">
+                <span className="flex items-center gap-1 font-semibold text-emerald-700">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Nube en tiempo real
+                </span>
+                <span>•</span>
+                <span>Hoja destino: <strong className="text-emerald-800">"encuesta IA"</strong></span>
+              </div>
             </div>
           </div>
 

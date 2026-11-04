@@ -21,6 +21,12 @@ import {
   fetchSheetResponses,
   sendViaAppsScript
 } from './lib/sheetsService';
+import { 
+  subscribeToSurveyResponses, 
+  saveResponseToFirestore, 
+  updateResponseSyncStatus,
+  testFirestoreConnection
+} from './lib/firestoreService';
 
 // Default initial responses seeded from the user's attachment:
 // /public/assets/aistudio/Encuesta_de_satisfaccion_sobre_la_sala_f3__respuestas__579e085f
@@ -90,7 +96,7 @@ export default function App() {
     };
   });
 
-  // Survey responses
+  // Survey responses (synced in real-time via Firestore across all devices)
   const [responses, setResponses] = useState<SurveyResponse[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY_RESPONSES);
@@ -104,7 +110,20 @@ export default function App() {
     return INITIAL_SAMPLE_RESPONSES;
   });
 
-  // Persist responses
+  // Real-time Firestore listener: updates all devices immediately without page refresh
+  useEffect(() => {
+    testFirestoreConnection();
+
+    const unsubscribeFirestore = subscribeToSurveyResponses((remoteResponses) => {
+      if (remoteResponses && remoteResponses.length > 0) {
+        setResponses(remoteResponses);
+      }
+    });
+
+    return () => unsubscribeFirestore();
+  }, []);
+
+  // Persist responses to localStorage as offline cache
   useEffect(() => {
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY_RESPONSES, JSON.stringify(responses));
@@ -122,7 +141,36 @@ export default function App() {
     }
   }, [sheetConfig]);
 
-  // Initialize Auth & auto-load responses from the default Google Sheet
+  // Automatic Background Sync to Google Sheets when user is logged in
+  useEffect(() => {
+    if (!user) return;
+
+    const pending = responses.filter((r) => !r.syncedToGoogleSheets);
+    if (pending.length === 0) return;
+
+    const runAutoSync = async () => {
+      const token = await getAccessToken();
+      if (!token) return;
+
+      const targetId = sheetConfig.spreadsheetId || DEFAULT_SPREADSHEET_ID;
+      const targetTab = sheetConfig.sheetTabName || TARGET_SHEET_NAME;
+
+      try {
+        await ensureEncuestaSheetExists(token, targetId, targetTab);
+        for (const item of pending) {
+          const row = responseToRow(item);
+          await appendRowToSheet(token, targetId, targetTab, row);
+          await updateResponseSyncStatus(item.id, true);
+        }
+      } catch (err) {
+        console.warn('Background auto-sync notice:', err);
+      }
+    };
+
+    runAutoSync();
+  }, [user, responses, sheetConfig.spreadsheetId, sheetConfig.sheetTabName]);
+
+  // Initialize Auth
   useEffect(() => {
     const unsubscribe = initAuth(
       async (currentUser, token) => {
@@ -132,12 +180,8 @@ export default function App() {
             const targetId = sheetConfig.spreadsheetId || DEFAULT_SPREADSHEET_ID;
             const targetTab = sheetConfig.sheetTabName || TARGET_SHEET_NAME;
             await ensureEncuestaSheetExists(token, targetId, targetTab);
-            const sheetRows = await fetchSheetResponses(token, targetId, targetTab);
-            if (sheetRows && sheetRows.length > 0) {
-              setResponses(sheetRows);
-            }
           } catch (err) {
-            console.warn('Auto-sync from default sheet on login:', err);
+            console.warn('Auto-sync on login note:', err);
           }
         }
       },
@@ -191,7 +235,14 @@ export default function App() {
     const targetSpreadsheetId = sheetConfig.spreadsheetId || DEFAULT_SPREADSHEET_ID;
     const targetTab = sheetConfig.sheetTabName || TARGET_SHEET_NAME;
 
-    // 1. Try sending via Google Sheets API if logged in and spreadsheet configured
+    // 1. Immediately persist to Firestore so ALL other devices see it in real time
+    try {
+      await saveResponseToFirestore(newResponse);
+    } catch (fsErr) {
+      console.warn('Firestore save warning:', fsErr);
+    }
+
+    // 2. Try sending directly to Google Sheets if user is authenticated or Apps Script is configured
     try {
       const token = await getAccessToken();
       if (token && targetSpreadsheetId) {
@@ -199,8 +250,9 @@ export default function App() {
         const row = responseToRow(newResponse);
         await appendRowToSheet(token, targetSpreadsheetId, targetTab, row);
         synced = true;
+        // Mark as synced in Firestore
+        await updateResponseSyncStatus(newResponse.id, true).catch(() => {});
       } else if (sheetConfig.appsScriptWebhookUrl) {
-        // 2. Try Apps Script Webhook
         await sendViaAppsScript(sheetConfig.appsScriptWebhookUrl, newResponse);
         synced = true;
       }
@@ -212,7 +264,12 @@ export default function App() {
 
     newResponse.syncedToGoogleSheets = synced;
 
-    setResponses((prev) => [newResponse, ...prev]);
+    // Optimistically update local state if not already pushed by Firestore listener
+    setResponses((prev) => {
+      const exists = prev.some((r) => r.id === newResponse.id);
+      return exists ? prev : [newResponse, ...prev];
+    });
+
     return true;
   };
 

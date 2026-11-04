@@ -208,11 +208,13 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
         <div className="flex items-start gap-3">
           <FileSpreadsheet className="w-5 h-5 shrink-0 mt-0.5 text-emerald-600" />
           <div>
-            <span className="font-bold">
-              Conectado a Google Sheets:
-            </span>{' '}
-            Las respuestas se registrarán directamente en la hoja oficial (ID: <span className="font-mono font-bold text-emerald-950 text-xs">1IcmRuDY...SOMf-P0kY</span>) en la pestaña llamada{' '}
-            <strong className="underline decoration-emerald-500 font-bold">"{sheetConfig.sheetTabName}"</strong>.
+            <div className="font-bold text-slate-900 flex items-center gap-1.5">
+              <span>Guardado automático multidispositivo activo</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            </div>
+            <p className="mt-0.5 text-xs text-slate-600">
+              Cualquier respuesta enviada desde este u otro celular/computador se guarda de inmediato en la nube y se vuelca automáticamente a su hoja de cálculo de Google (ID: <span className="font-mono font-bold text-emerald-950">1IcmRuDY...SOMf-P0kY</span>) en la pestaña <strong className="text-emerald-800 font-bold">"{sheetConfig.sheetTabName}"</strong>.
+            </p>
           </div>
         </div>
         <button
